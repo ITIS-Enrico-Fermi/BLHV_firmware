@@ -47,8 +47,22 @@ float pid_compensator(int setpoint, int processvar) {
     return prop + integ + deriv;
 }
 
+/**
+ * Converts PID compensator output (floating point) to DAC
+ * and clamps result in [0, 255] interval.
+*/
+int prepare_output(float compensator_out) {
+    int out = ((int)compensator_out) >> 4;
+    if(out < 0)
+        out = 0;
+    else if (out > 255)
+        out = 255;
+
+    return out;
+}
+
 void app_main() {
-    int adc_val;
+    int adc_val, dac_val;
     float actuator_output;
 
     adc_setup();
@@ -60,7 +74,8 @@ void app_main() {
         actuator_output = pid_compensator(target, adc_val);
         ESP_LOGI("PID", "Reading: %d. Output: %.3f", adc_val, actuator_output);
 
-        dac_write(((int)actuator_output) >> 4);
+        dac_val = prepare_output(actuator_output);
+        dac_write(dac_val);
         
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
