@@ -6,30 +6,33 @@
 #include "sdkconfig.h"
 
 #include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "esp_log.h"
 #include "hal/adc_types.h"
 
 #include "adc.h"
 #include "dac.h"
 
+int particle_filter(int in) {
+    return in;
+}
 
 void app_main() {
-    adc_setup();
-    adc_start();
+    int adc_val;
+    int filtered_value;
 
+    adc_setup();
     dac_setup();
 
-    int ret;
-    adc_digi_output_data_t result[128];
-    int out_length;
-
     while(true) {
-        ret = adc_read(result, sizeof(result), &out_length);
+        adc_val = adc_read();
+        
+        filtered_value = particle_filter(adc_val);
 
-        if(ret == ESP_OK) {
-            ESP_LOGI("ADC", "ADC returned %d bytes of result", out_length);
-        } else {
-            ESP_LOGW("ADC", "ADC error %d", ret);
-        }
+        dac_write(filtered_value >> 4);
+
+        ESP_LOGI("ADC", "Reading: %d", adc_val);
+        
+        vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }

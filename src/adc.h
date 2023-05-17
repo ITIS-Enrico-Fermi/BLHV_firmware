@@ -3,6 +3,15 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+/**
+ * Sets up ADC1 on channel 6 for one shot readings, that corresponds to GPIO 34.
+ * One shot readings are suitable for low frequency readings.
+ * 
+ * The ADC readings are 12 bit long.
+*/
 bool adc_setup();
-void adc_start();
-int adc_read(uint8_t *buf, uint32_t length_max, uint32_t *out_length);
+
+/**
+ * Reads a single value from the ADC. This function is thread-safe.
+*/
+int adc_read();
