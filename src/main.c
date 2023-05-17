@@ -13,13 +13,43 @@
 #include "adc.h"
 #include "dac.h"
 
-int particle_filter(int in) {
-    return in;
+static int target = 2000;    // < target current measured in ADC units
+
+/**
+ * Compute actuator output to reach the set point.
+ * 
+ * @param setpoint the desidered value to reach
+ * @param processvar current process variable value, in the same unit as setpoint
+ * @return an integer representing actuator output, to be converted to a suitable unit
+ * for your actuator. Unit: same as input.
+*/
+float pid_compensator(int setpoint, int processvar) {
+    const float kp = 0.1;
+    const float ki = 0.05;
+    const float kd = 0;
+
+    // State variables
+    int error = setpoint - processvar;  // < e(t) = error at current time
+    static float integralerror = 0;
+    static int lasterror = 0;
+
+    // Proportional component
+    float prop = kp * error;
+
+    // Integral component
+    integralerror += error;
+    float integ = ki * integralerror;
+
+    // Derivative component
+    float deriv = kd * (error - lasterror);
+    lasterror = error;
+
+    return prop + integ + deriv;
 }
 
 void app_main() {
     int adc_val;
-    int filtered_value;
+    float actuator_output;
 
     adc_setup();
     dac_setup();
@@ -27,11 +57,10 @@ void app_main() {
     while(true) {
         adc_val = adc_read();
         
-        filtered_value = particle_filter(adc_val);
+        actuator_output = pid_compensator(target, adc_val);
+        ESP_LOGI("PID", "Reading: %d. Output: %.3f", adc_val, actuator_output);
 
-        dac_write(filtered_value >> 4);
-
-        ESP_LOGI("ADC", "Reading: %d", adc_val);
+        dac_write(((int)actuator_output) >> 4);
         
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
