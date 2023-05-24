@@ -11,8 +11,9 @@
 #include "hal/adc_types.h"
 #include "driver/uart.h"
 
-#include "adc.h"
-#include "dac.h"
+#include "adc/adc.h"
+#include "dac/dac.h"
+#include "utils/utils.h"
 
 static int target = 2000;    // < target current measured in ADC units
 
@@ -49,22 +50,20 @@ float pid_compensator(int setpoint, int processvar) {
 }
 
 /**
- * Converts PID compensator output (floating point) to DAC
+ * Converts PID compensator output (floating point, 12 bits) to DAC
  * and clamps result in [0, 255] interval.
 */
 int prepare_output(float compensator_out) {
-    int out = ((int)compensator_out) >> 4;
-    if(out < 0)
-        out = 0;
-    else if (out > 255)
-        out = 255;
-
-    return out;
+    return clamp(
+        (int) compensator_out >> 4,
+        0,
+        255
+    );
 }
 
 void app_main() {
-    int adc_val, dac_val;
-    float actuator_output;
+  int adc_val, dac_val;
+  float actuator_output;
 
     int read_bytes;
     char incoming[100];
@@ -90,9 +89,9 @@ void app_main() {
         actuator_output = pid_compensator(target, adc_val);
         ESP_LOGI("PID", "Reading: %d. Output: %.3f", adc_val, actuator_output);
 
-        dac_val = prepare_output(actuator_output);
-        dac_write(dac_val);
-        
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
+    dac_val = prepare_output(actuator_output);
+    dac_write(dac_val);
+    
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+  }
 }
