@@ -26,7 +26,7 @@ bool adc_setup() {
     ESP_ERROR_CHECK(adc_oneshot_new_unit(&adc_config, &adc1));
 
     adc_oneshot_chan_cfg_t channel_conf = {
-        .atten = ADC_ATTEN_DB_0,
+        .atten = ADC_ATTEN_DB_11,
         .bitwidth = ADC_BITWIDTH_12
     };
     ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1, channel_num, &channel_conf));
