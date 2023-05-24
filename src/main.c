@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <float.h>
 
 #include "sdkconfig.h"
 
@@ -14,7 +15,20 @@
 #include "dac/dac.h"
 #include "utils/utils.h"
 
-static int target = 2000;    // < target current measured in ADC units
+static float target = 0.5;    // < target current measured in ADC units
+static struct {
+  float kp;
+  float ki;
+  float kd;
+  float sat_min;  /** Saturation lower bound */
+  float sat_max;  /** Saturation upper bound */
+} pid_tuning = {
+  .kp = 2,
+  .ki = 5e-3,
+  .kd = 0,
+  .sat_min = -1,
+  .sat_max = 1
+};
 
 /**
  * Compute actuator output to reach the set point.
@@ -24,56 +38,59 @@ static int target = 2000;    // < target current measured in ADC units
  * @return an integer representing actuator output, to be converted to a suitable unit
  * for your actuator. Unit: same as input.
 */
-float pid_compensator(int setpoint, int processvar) {
-  const float kp = 0.1;
-  const float ki = 0.05;
-  const float kd = 0;
-
+float pid_compensator(float setpoint, float processvar) {
   // State variables
-  int error = setpoint - processvar;  // < e(t) = error at current time
+  float error = setpoint - processvar;  // < e(t) = error at current time
   static float integralerror = 0;
-  static int lasterror = 0;
+  static float lasterror = 0;
 
   // Proportional component
-  float prop = kp * error;
+  float prop = pid_tuning.kp * error;
 
   // Integral component
   integralerror += error;
-  float integ = ki * integralerror;
+  float integ = pid_tuning.ki * integralerror;
 
   // Derivative component
-  float deriv = kd * (error - lasterror);
+  float deriv = pid_tuning.kd * (error - lasterror);
   lasterror = error;
 
-  return prop + integ + deriv;
+  return clamp(prop + integ + deriv, pid_tuning.sat_min, pid_tuning.sat_max);
 }
 
 /**
- * Converts PID compensator output (floating point, 12 bits) to DAC
+ * Converts PID compensator output (floating point) to DAC
  * and clamps result in [0, 255] interval.
 */
 int prepare_output(float compensator_out) {
   return clamp(
-    (int) compensator_out >> 4,
+    normalize(compensator_out, 0, FLT_MAX) * 255.f,
     0,
     255
   );
 }
 
 void app_main() {
-  int adc_val, dac_val;
-  float actuator_output;
+  float adc_val_normalized;
+  int dac_val;
+  float pid_out;
 
   adc_setup();
   dac_setup();
 
   while(true) {
-    adc_val = adc_read();
+    adc_val_normalized = clamp(
+      normalize(
+        adc_read(),
+        0, 1 << 12
+      ),
+      0, 1
+    );
     
-    actuator_output = pid_compensator(target, adc_val);
-    ESP_LOGI("PID", "Reading: %d. Output: %.3f", adc_val, actuator_output);
+    pid_out = pid_compensator(target, adc_val_normalized);
+    dac_val = pid_out * 255;
+    ESP_LOGI("PID", "Reading: %f.2. Output: %d, %f.2", adc_val_normalized, dac_val, pid_out);
 
-    dac_val = prepare_output(actuator_output);
     dac_write(dac_val);
     
     vTaskDelay(100 / portTICK_PERIOD_MS);
