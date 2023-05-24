@@ -9,11 +9,16 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "hal/adc_types.h"
+#include "driver/uart.h"
 
 #include "adc.h"
 #include "dac.h"
 
 static int target = 2000;    // < target current measured in ADC units
+
+static float kp = 0.1;
+static float ki = 0.05;
+static float kd = 0;
 
 /**
  * Compute actuator output to reach the set point.
@@ -24,10 +29,6 @@ static int target = 2000;    // < target current measured in ADC units
  * for your actuator. Unit: same as input.
 */
 float pid_compensator(int setpoint, int processvar) {
-    const float kp = 0.1;
-    const float ki = 0.05;
-    const float kd = 0;
-
     // State variables
     int error = setpoint - processvar;  // < e(t) = error at current time
     static float integralerror = 0;
@@ -65,10 +66,25 @@ void app_main() {
     int adc_val, dac_val;
     float actuator_output;
 
+    int read_bytes;
+    char incoming[100];
+
     adc_setup();
     dac_setup();
 
+    uart_config_t uart_conf = {.baud_rate=115200, .data_bits=UART_DATA_8_BITS, .parity=UART_PARITY_DISABLE, .stop_bits=UART_STOP_BITS_1, .flow_ctrl=UART_HW_FLOWCTRL_DISABLE, .rx_flow_ctrl_thresh=122, .source_clk=UART_SCLK_DEFAULT};
+    ESP_ERROR_CHECK(uart_param_config(UART_NUM_0, &uart_conf));
+    ESP_ERROR_CHECK(uart_set_pin(UART_NUM_0, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, 18, 19));
+    ESP_ERROR_CHECK(uart_driver_install(UART_NUM_0, 2048, 2048, 10, NULL, 0));
+
     while(true) {
+        read_bytes = uart_read_bytes(UART_NUM_0, incoming, 15, 10 / portTICK_PERIOD_MS);
+
+        if(read_bytes > 0) {
+            sscanf(incoming, "%f%f%f", &kp, &ki, &kd);
+            ESP_LOGI("Tuner", "Read parameters: %.2f, %.2f, %.2f", kp, ki, kd);
+        }
+
         adc_val = adc_read();
         
         actuator_output = pid_compensator(target, adc_val);
