@@ -12,6 +12,7 @@
 
 #include "adc.h"
 #include "dac.h"
+#include "utils.h"
 
 static int target = 2000;    // < target current measured in ADC units
 
@@ -24,59 +25,57 @@ static int target = 2000;    // < target current measured in ADC units
  * for your actuator. Unit: same as input.
 */
 float pid_compensator(int setpoint, int processvar) {
-    const float kp = 0.1;
-    const float ki = 0.05;
-    const float kd = 0;
+  const float kp = 0.1;
+  const float ki = 0.05;
+  const float kd = 0;
 
-    // State variables
-    int error = setpoint - processvar;  // < e(t) = error at current time
-    static float integralerror = 0;
-    static int lasterror = 0;
+  // State variables
+  int error = setpoint - processvar;  // < e(t) = error at current time
+  static float integralerror = 0;
+  static int lasterror = 0;
 
-    // Proportional component
-    float prop = kp * error;
+  // Proportional component
+  float prop = kp * error;
 
-    // Integral component
-    integralerror += error;
-    float integ = ki * integralerror;
+  // Integral component
+  integralerror += error;
+  float integ = ki * integralerror;
 
-    // Derivative component
-    float deriv = kd * (error - lasterror);
-    lasterror = error;
+  // Derivative component
+  float deriv = kd * (error - lasterror);
+  lasterror = error;
 
-    return prop + integ + deriv;
+  return prop + integ + deriv;
 }
 
 /**
- * Converts PID compensator output (floating point) to DAC
+ * Converts PID compensator output (floating point, 12 bits) to DAC
  * and clamps result in [0, 255] interval.
 */
 int prepare_output(float compensator_out) {
-    int out = ((int)compensator_out) >> 4;
-    if(out < 0)
-        out = 0;
-    else if (out > 255)
-        out = 255;
-
-    return out;
+  return clamp(
+    (int) compensator_out >> 4,
+    0,
+    255
+  );
 }
 
 void app_main() {
-    int adc_val, dac_val;
-    float actuator_output;
+  int adc_val, dac_val;
+  float actuator_output;
 
-    adc_setup();
-    dac_setup();
+  adc_setup();
+  dac_setup();
 
-    while(true) {
-        adc_val = adc_read();
-        
-        actuator_output = pid_compensator(target, adc_val);
-        ESP_LOGI("PID", "Reading: %d. Output: %.3f", adc_val, actuator_output);
+  while(true) {
+    adc_val = adc_read();
+    
+    actuator_output = pid_compensator(target, adc_val);
+    ESP_LOGI("PID", "Reading: %d. Output: %.3f", adc_val, actuator_output);
 
-        dac_val = prepare_output(actuator_output);
-        dac_write(dac_val);
-        
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
+    dac_val = prepare_output(actuator_output);
+    dac_write(dac_val);
+    
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+  }
 }
