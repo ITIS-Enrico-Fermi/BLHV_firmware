@@ -10,9 +10,9 @@
 #include "esp_log.h"
 #include "hal/adc_types.h"
 
-#include "adc.h"
-#include "dac.h"
-#include "utils.h"
+#include "adc/adc.h"
+#include "dac/dac.h"
+#include "utils/utils.h"
 
 static int target = 2000;    // < target current measured in ADC units
 
