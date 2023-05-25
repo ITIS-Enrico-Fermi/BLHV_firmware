@@ -2,5 +2,6 @@
   "cmake.configureOnOpen": false,
   "files.associations": {
     "utils.h": "c"
-  }
+  },
+  "editor.tabSize": 4
 }
