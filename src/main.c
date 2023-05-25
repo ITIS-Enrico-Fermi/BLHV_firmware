@@ -10,6 +10,7 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "hal/adc_types.h"
+#include "driver/uart.h"
 
 #include "adc/adc.h"
 #include "dac/dac.h"
@@ -58,27 +59,30 @@ float pid_compensator(float setpoint, float processvar) {
   return clamp(prop + integ + deriv, pid_tuning.sat_min, pid_tuning.sat_max);
 }
 
-/**
- * Converts PID compensator output (floating point) to DAC
- * and clamps result in [0, 255] interval.
-*/
-int prepare_output(float compensator_out) {
-  return clamp(
-    normalize(compensator_out, 0, FLT_MAX) * 255.f,
-    0,
-    255
-  );
-}
-
 void app_main() {
   float adc_val_normalized;
   int dac_val;
   float pid_out;
 
+  int read_bytes;
+  char incoming[100];
+
   adc_setup();
   dac_setup();
 
+  uart_config_t uart_conf = {.baud_rate=115200, .data_bits=UART_DATA_8_BITS, .parity=UART_PARITY_DISABLE, .stop_bits=UART_STOP_BITS_1, .flow_ctrl=UART_HW_FLOWCTRL_DISABLE, .rx_flow_ctrl_thresh=122, .source_clk=UART_SCLK_DEFAULT};
+  ESP_ERROR_CHECK(uart_param_config(UART_NUM_0, &uart_conf));
+  ESP_ERROR_CHECK(uart_set_pin(UART_NUM_0, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, 18, 19));
+  ESP_ERROR_CHECK(uart_driver_install(UART_NUM_0, 2048, 2048, 10, NULL, 0));
+
   while(true) {
+    read_bytes = uart_read_bytes(UART_NUM_0, incoming, 15, 10 / portTICK_PERIOD_MS);
+   
+    if(read_bytes > 0) {
+      sscanf(incoming, "%f%f%f", &pid_tuning.kp, &pid_tuning.ki, &pid_tuning.kd);
+      ESP_LOGI("Tuner", "Read parameters: %.2f, %.2f, %.2f", pid_tuning.kp, pid_tuning.ki, pid_tuning.kd);
+    }
+    
     adc_val_normalized = clamp(
       normalize(
         adc_read(),
