@@ -14,7 +14,6 @@ class TuningKnob(QtWidgets.QWidget):
         self.knob.setMaximum(1000)
         self.knob.setMinimum(0)
 
-        self.knob.valueChanged.connect(valueChangedCb)
         self.knob.valueChanged.connect(self.updateIndicator)
 
         self.layout = QtWidgets.QVBoxLayout(self)
@@ -38,10 +37,14 @@ class MainWindow(QtWidgets.QWidget):
         self.ki_knob = TuningKnob("ki", self.paramChanged)
         self.kd_knob = TuningKnob("kd", self.paramChanged)
 
+        self.button = QtWidgets.QPushButton("Update")
+        self.button.clicked.connect(self.paramChanged)
+
         self.layout = QtWidgets.QHBoxLayout(self)
         self.layout.addWidget(self.kp_knob)
         self.layout.addWidget(self.ki_knob)
         self.layout.addWidget(self.kd_knob)
+        self.layout.addWidget(self.button)
 
         self.serial = serial
 
@@ -55,7 +58,7 @@ class MainWindow(QtWidgets.QWidget):
         kd = self.kd_knob.getValue()
 
         print(f"kp: {kp}, ki: {ki}, kd: {kd}")
-        self.serial.write(f"{kp} {ki} {kd}".encode())
+        self.serial.write(f"{kp:.2} {ki:.2} {kd:.2}".encode())
 
 
 if __name__ == "__main__":
