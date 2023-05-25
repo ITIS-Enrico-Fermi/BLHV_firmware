@@ -2,10 +2,10 @@
 #include <stdbool.h>
 
 float clamp(float val, float inf, float sup) {
-  float v = val < inf ? inf : val;
+    float v = val < inf ? inf : val;
   return v > sup ? sup : v;
 }
 
 float normalize(float val, float min, float max) {
-  return (val - min) / (max - min);
+    return (val - min) / (max - min);
 }
