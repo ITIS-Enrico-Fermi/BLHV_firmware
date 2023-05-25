@@ -8,19 +8,26 @@ class TuningKnob(QtWidgets.QWidget):
         super().__init__()
 
         self.text = QtWidgets.QLabel(parameterLabel, alignment=QtCore.Qt.AlignCenter)
+        self.indicator = QtWidgets.QLabel("", alignment=QtCore.Qt.AlignCenter)
         
         self.knob = QtWidgets.QDial()
         self.knob.setMaximum(1000)
         self.knob.setMinimum(0)
 
         self.knob.valueChanged.connect(valueChangedCb)
+        self.knob.valueChanged.connect(self.updateIndicator)
 
         self.layout = QtWidgets.QVBoxLayout(self)
         self.layout.addWidget(self.text)
+        self.layout.addWidget(self.indicator)
         self.layout.addWidget(self.knob)
 
     def getValue(self) -> float:
         return self.knob.value() / 1000
+    
+    @QtCore.Slot(int)
+    def updateIndicator(self, val: int):
+        self.indicator.setText(f"{val/1000}")
 
 
 class MainWindow(QtWidgets.QWidget):
@@ -54,7 +61,7 @@ class MainWindow(QtWidgets.QWidget):
 if __name__ == "__main__":
     app = QtWidgets.QApplication([])
 
-    with Serial("/dev/ttyusb0", 115200) as s:
+    with Serial("/dev/cu.usbserial-0001", 115200) as s:
         window = MainWindow(s)
 
         window.resize(800, 600)
