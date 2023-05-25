@@ -17,7 +17,7 @@ static adc_channel_t channel_num;
 
 bool adc_setup() {
     int unit_num;
-    ESP_ERROR_CHECK(adc_oneshot_io_to_channel(34, &unit_num, &channel_num));
+    ESP_ERROR_CHECK(adc_oneshot_io_to_channel(35, &unit_num, &channel_num));
 
     adc_oneshot_unit_init_cfg_t adc_config = {
         .unit_id = unit_num,

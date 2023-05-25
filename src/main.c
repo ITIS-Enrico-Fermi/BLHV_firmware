@@ -16,7 +16,7 @@
 #include "dac/dac.h"
 #include "utils/utils.h"
 
-static float target = 0.5;    // < target current measured in ADC units
+static float target = 0.17;    // < target current measured in ADC units
 static struct {
   float kp;
   float ki;
@@ -24,11 +24,11 @@ static struct {
   float sat_min;  /** Saturation lower bound */
   float sat_max;  /** Saturation upper bound */
 } pid_tuning = {
-  .kp = 2,
-  .ki = 5e-3,
+  .kp = 0.05,
+  .ki = 0.002,
   .kd = 0,
-  .sat_min = -1,
-  .sat_max = 1
+  .sat_min = -0.235,
+  .sat_max = 0.235
 };
 
 /**
@@ -61,7 +61,7 @@ float pid_compensator(float setpoint, float processvar) {
 
 void app_main() {
   float adc_val_normalized;
-  int dac_val;
+  int dac_val, adc_val;
   float pid_out;
 
   int read_bytes;
@@ -83,9 +83,10 @@ void app_main() {
       ESP_LOGI("Tuner", "Read parameters: %.2f, %.2f, %.2f", pid_tuning.kp, pid_tuning.ki, pid_tuning.kd);
     }
     
+    adc_val = adc_read();
     adc_val_normalized = clamp(
       normalize(
-        adc_read(),
+        adc_val,
         0, 1 << 12
       ),
       0, 1
@@ -93,7 +94,7 @@ void app_main() {
     
     pid_out = pid_compensator(target, adc_val_normalized);
     dac_val = pid_out * 255;
-    ESP_LOGI("PID", "Reading: %f.2. Output: %d, %f.2", adc_val_normalized, dac_val, pid_out);
+    ESP_LOGI("PID", "Reading: %d, %.5f. Output: %d, %.2f", adc_val, adc_val_normalized, dac_val, pid_out);
 
     dac_write(dac_val);
     
