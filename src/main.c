@@ -28,7 +28,8 @@ static struct {
     .ki = 0.002,
     .kd = 0,
     .sat_min = -0.235,
-    .sat_max = 0.235};
+    .sat_max = 0.235
+};
 
 /**
  * Compute actuator output to reach the set point.
