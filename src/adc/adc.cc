@@ -1,3 +1,4 @@
+#include <Arduino.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -7,15 +8,16 @@
 
 #include "freertos/FreeRTOS.h"
 #include "esp_log.h"
-#include "esp_adc/adc_oneshot.h"
+//#include "esp_adc/adc_oneshot.h"
 #include "hal/adc_types.h"
 
 #include "adc.h"
 
-static adc_oneshot_unit_handle_t adc1 = NULL;
+//static adc_oneshot_unit_handle_t adc1 = NULL;
 static adc_channel_t channel_num;
 
 bool adc_setup() {
+    /*
     int unit_num;
     ESP_ERROR_CHECK(adc_oneshot_io_to_channel(35, &unit_num, &channel_num));
 
@@ -30,13 +32,18 @@ bool adc_setup() {
         .bitwidth = ADC_BITWIDTH_12
     };
     ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1, channel_num, &channel_conf));
+    */
 
     return true;
 }
 
 int adc_read() {
+    /*
     int ret_value;
     adc_oneshot_read(adc1, channel_num, &ret_value);
     
     return ret_value;
+    */
+
+    return analogRead(35);
 }

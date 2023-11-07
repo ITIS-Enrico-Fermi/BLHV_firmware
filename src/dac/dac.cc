@@ -1,3 +1,5 @@
+#include <Arduino.h>
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -5,14 +7,15 @@
 #include "sdkconfig.h"
 
 #include "esp_log.h"
-#include "driver/i2s_std.h"
+//#include "driver/i2s_std.h"
 
 #include "dac.h"
 
-static i2s_chan_handle_t tx_chan;
+//static i2s_chan_handle_t tx_chan;
 static bool tx_chan_enabled = false;
 
 bool dac_setup() {
+    /*
     i2s_chan_config_t tx_chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_MASTER);
     ESP_ERROR_CHECK(i2s_new_channel(&tx_chan_cfg, &tx_chan, NULL));
 
@@ -33,11 +36,13 @@ bool dac_setup() {
         },
     };
     ESP_ERROR_CHECK(i2s_channel_init_std_mode(tx_chan, &tx_std_cfg));
+    */
 
     return true;
 }
 
 int dac_write(uint8_t datum) {
+    /*
     uint32_t i2sdata[2] = {datum << 24, datum << 24};
     size_t data_sz = sizeof(i2sdata);
 
@@ -49,6 +54,8 @@ int dac_write(uint8_t datum) {
     if (i2s_channel_write(tx_chan, i2sdata, sizeof(uint32_t) * 2, &data_sz, 1000) != ESP_OK)
         ESP_LOGE("DAC", "I2S write failed");
 
-    
+    */
+
+    dacWrite(25, datum);
     return 1;
 }
