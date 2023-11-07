@@ -14,6 +14,12 @@
 #include "dac/dac.h"
 #include "utils/utils.h"
 
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+Adafruit_SSD1306 display(128, 32, &Wire, -1);
+
 static float target = 0.17; // < target current measured in ADC units
 static struct {
     float kp;
@@ -56,6 +62,21 @@ float pid_compensator(float setpoint, float processvar) {
     return clamp(prop + integ + deriv, pid_tuning.sat_min, pid_tuning.sat_max);
 }
 
+void oled_interface_task(void *params) {
+    display.clearDisplay();
+    display.setTextSize(4); // Draw 2X-scale text
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(0, 0);
+    display.println("BLHV");
+    display.display();      // Show initial text
+    vTaskDelay(100 / portTICK_RATE_MS);
+    display.startscrollleft(0x00, 0x0F);
+
+    vTaskDelay(0xffffffff);
+
+    vTaskDelete(NULL);
+}
+
 void setup() {
     float adc_val_normalized;
     int dac_val, adc_val;
@@ -68,6 +89,10 @@ void setup() {
     dac_setup();
 
     Serial.begin(115200);
+    if (not display.begin(SSD1306_SWITCHCAPVCC, 0x3c))
+        Serial.println("There was an error with the SSD1306 display init");
+
+    xTaskCreate(oled_interface_task, "oled", 2048, nullptr, 2, nullptr);
 
     while (true) {
         read_bytes = Serial.readBytes(incoming, 100);
