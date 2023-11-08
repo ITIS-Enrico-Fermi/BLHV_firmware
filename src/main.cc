@@ -17,8 +17,16 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <Adafruit_ST7735.h>
+
+#include "fonts/Inter_Light28pt7b.h"
+
+#define TFT_CS         14
+#define TFT_RST        15
+#define TFT_DC         32
 
 Adafruit_SSD1306 display(128, 32, &Wire, -1);
+Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, 23, 18, TFT_RST);
 
 static float target = 0.17; // < target current measured in ADC units
 static struct {
@@ -64,7 +72,6 @@ float pid_compensator(float setpoint, float processvar) {
 
 void oled_interface_task(void *params) {
     display.clearDisplay();
-    display.setTextSize(4); // Draw 2X-scale text
     display.setTextColor(SSD1306_WHITE);
     display.setCursor(0, 0);
     display.println("BLHV");
@@ -93,6 +100,15 @@ void setup() {
         Serial.println("There was an error with the SSD1306 display init");
 
     xTaskCreate(oled_interface_task, "oled", 2048, nullptr, 2, nullptr);
+
+    tft.initR(INITR_BLACKTAB);
+
+    tft.setRotation(3);
+    tft.fillScreen(ST7735_BLACK);
+
+    tft.setTextColor(ST7735_WHITE);
+    tft.setTextSize(2);
+    tft.println("BLHV");
 
     while (true) {
         read_bytes = Serial.readBytes(incoming, 100);
