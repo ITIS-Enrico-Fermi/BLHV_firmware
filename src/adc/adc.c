@@ -17,7 +17,15 @@ static adc_channel_t channel_num;
 
 bool adc_setup() {
     int unit_num;
-    ESP_ERROR_CHECK(adc_oneshot_io_to_channel(35, &unit_num, &channel_num));
+    #ifdef ARDUINO_ESP32S2_DEV
+    const uint8_t io = 20;
+    const uint8_t bitwidth = ADC_BITWIDTH_13;
+    #endif
+    #ifdef ARDUINO_ESP32_DEV
+    const uint8_t io = 35;
+    const uint8_t bitwidth = ADC_BITWIDTH_12;
+    #endif
+    ESP_ERROR_CHECK(adc_oneshot_io_to_channel(io, &unit_num, &channel_num));
 
     adc_oneshot_unit_init_cfg_t adc_config = {
         .unit_id = unit_num,
@@ -27,7 +35,7 @@ bool adc_setup() {
 
     adc_oneshot_chan_cfg_t channel_conf = {
         .atten = ADC_ATTEN_DB_11,
-        .bitwidth = ADC_BITWIDTH_12
+        .bitwidth = bitwidth
     };
     ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1, channel_num, &channel_conf));
 

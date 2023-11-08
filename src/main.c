@@ -44,19 +44,23 @@ float pid_compensator(float setpoint, float processvar) {
     float error = setpoint - processvar; // < e(t) = error at current time
     static float integralerror = 0;
     static float lasterror = 0;
+    static float output = 0;
 
     // Proportional component
     float prop = pid_tuning.kp * error;
 
     // Integral component
-    integralerror += error;
-    float integ = pid_tuning.ki * integralerror;
+    if (output > pid_tuning.sat_min && output < pid_tuning.sat_max) {
+        integralerror += error;
+    }
+    float integ = pid_tuning.ki * integralerror;;
 
     // Derivative component
     float deriv = pid_tuning.kd * (error - lasterror);
     lasterror = error;
 
-    return clamp(prop + integ + deriv, pid_tuning.sat_min, pid_tuning.sat_max);
+    output = prop + integ + deriv;
+    return clamp(output, pid_tuning.sat_min, pid_tuning.sat_max);
 }
 
 void app_main() {
