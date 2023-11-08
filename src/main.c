@@ -53,7 +53,7 @@ float pid_compensator(float setpoint, float processvar) {
     if (output > pid_tuning.sat_min && output < pid_tuning.sat_max) {
         integralerror += error;
     }
-    float integ = pid_tuning.ki * integralerror;;
+    float integ = pid_tuning.ki * integralerror;
 
     // Derivative component
     float deriv = pid_tuning.kd * (error - lasterror);
