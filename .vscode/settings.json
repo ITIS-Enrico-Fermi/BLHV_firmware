@@ -1,7 +1,9 @@
 {
   "cmake.configureOnOpen": false,
   "files.associations": {
-    "utils.h": "c"
-  },
+    "utils.h": "c",
+    "sdkconfig.h": "c",
+    "dac.h": "c"
+},
   "editor.tabSize": 4
 }
