@@ -136,11 +136,14 @@ void buzzTask(void *pvParams) {
 }
 
 void runISR() {
-    digitalWrite((uint8_t) Pinout::RUN_SW_LED, !digitalRead((uint8_t) Pinout::RUN_SW_LED));
+    // digitalWrite((uint8_t) Pinout::RUN_SW_LED, !digitalRead((uint8_t) Pinout::RUN_SW_LED));
+    digitalWrite((uint8_t) Pinout::RUN_SW_LED, HIGH);
     xTaskCreate(buzzTask, "buzzTask", 512, nullptr, 5, nullptr);
 }
 
-void stopISR() {}
+void stopISR() {
+    digitalWrite((uint8_t) Pinout::RUN_SW_LED, LOW);
+}
 
 auto controllerOut = dac::DAC8571((uint8_t) Pinout::SDA, (uint8_t) Pinout::SCL, 0u);
 
@@ -163,6 +166,6 @@ void loop() {
     printf("%d\n", i);
     controllerOut.dacWrite(i);
 
-    delay(100);
-    i+=1000;
+    delay(1);
+    i+=5;
 }
