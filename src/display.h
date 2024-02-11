@@ -4,7 +4,7 @@
 #include "lcdgfx_gui.h"
 
 class Display {
-private:
+protected:
     DisplaySSD1306_128x32_I2C hardware;
 
 public:
@@ -21,5 +21,9 @@ public:
     */
     void test() {
         hardware.write("Hello world");
+    }
+
+    DisplaySSD1306_128x32_I2C & getHardwareHandle() {
+        return hardware;
     }
 };

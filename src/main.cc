@@ -17,6 +17,8 @@
 #include <Wire.h>
 #include "display.h"
 
+#include "screen.h"
+#include "screen_statusmonitor.h"
 
 #define TFT_CS         14
 #define TFT_RST        15
@@ -87,6 +89,17 @@ void setup() {
     display.setup();
 
     display.test();
+
+    display.getHardwareHandle().clear();
+
+    Screen *current_screen = new Screens::StatusMonitor(display);
+    Screens::StatusMonitor::Status mainscreenstatus = {
+        .running = true,
+        .input_val = 100,
+        .output_val = 100,
+        .program = 2
+    };
+    current_screen->update((void *)&mainscreenstatus);
 
     while (true) {
         read_bytes = Serial.readBytes(incoming, 100);
