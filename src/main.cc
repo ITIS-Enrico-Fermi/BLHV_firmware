@@ -15,8 +15,7 @@
 #include "utils/utils.h"
 
 #include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include "display.h"
 
 
 #define TFT_CS         14
@@ -26,7 +25,8 @@
 namespace HMI {
     TwoWire &I2CController = Wire;
 }
-Adafruit_SSD1306 display(128, 32, &HMI::I2CController, -1);
+
+Display display;
 
 static float target = 0.17; // < target current measured in ADC units
 static struct {
@@ -70,34 +70,6 @@ float pid_compensator(float setpoint, float processvar) {
     return clamp(prop + integ + deriv, pid_tuning.sat_min, pid_tuning.sat_max);
 }
 
-void oled_interface_task(void *params) {
-    display.setRotation(2);
-    display.clearDisplay();
-    display.setTextColor(SSD1306_WHITE);
-    display.setTextSize(4);
-
-    int i = 0;
-    
-    while (true) {
-        display.clearDisplay();
-        display.setCursor(0, 0);
-
-        display.println(i++);
-
-        display.display();
-
-        display.startscrollleft(0x00, 0x0F);
-        vTaskDelay(2500 / portTICK_RATE_MS);
-    }
-
-    display.fillScreen(WHITE);
-    display.display();
-
-    vTaskDelay(0xffffffff);
-
-    vTaskDelete(NULL);
-}
-
 void setup() {
     float adc_val_normalized;
     int dac_val, adc_val;
@@ -112,10 +84,9 @@ void setup() {
     HMI::I2CController.setPins(32, 33);
 
     Serial.begin(115200);
-    if (not display.begin(SSD1306_SWITCHCAPVCC, 0x3c))
-        Serial.println("There was an error with the SSD1306 display init");
+    display.setup();
 
-    xTaskCreate(oled_interface_task, "oled", 2048, nullptr, 2, nullptr);
+    display.test();
 
     while (true) {
         read_bytes = Serial.readBytes(incoming, 100);
