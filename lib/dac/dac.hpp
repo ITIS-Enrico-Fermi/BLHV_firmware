@@ -28,7 +28,7 @@ namespace dac {
                 i2c->begin();
             }
 
-            inline DAC8571(TwoWire i2c) : i2c(&i2c) {}
+            inline DAC8571(TwoWire &i2c) : i2c(&i2c) {}
 
             
             inline bool write(uint16_t val) override {

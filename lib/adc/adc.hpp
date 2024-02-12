@@ -29,7 +29,7 @@ namespace adc {
                     i2c->begin();
             }
 
-            inline MCP3428(TwoWire i2c) : i2c(&i2c) {}
+            inline MCP3428(TwoWire &i2c) : i2c(&i2c) {}
 
             inline bool config(Channel c, Mode m, Resolution r, Gain g) {
                 const uint8_t CONF =
@@ -49,7 +49,10 @@ namespace adc {
                 uint8_t bytes[BYTES];
                 i2c->requestFrom(ADDR, BYTES);
                 i2c->readBytes(bytes, BYTES);
-                return (bytes[0] << 8) | bytes[1];
+
+                uint16_t val = (bytes[0] << 8) | bytes[1];
+
+                return val > 32767 ? val - 65533 : val;
             }
     };
 }

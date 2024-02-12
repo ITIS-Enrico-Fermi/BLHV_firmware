@@ -17,7 +17,7 @@ namespace controls {
         private:
             adc::ADC<uint16_t> *adc;
             dac::DAC<uint16_t> *dac;
-        
+
         public:
             PID(adc::ADC<uint16_t> *adc, dac::DAC<uint16_t> *dac) : adc(adc), dac(dac) {};
 
