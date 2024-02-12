@@ -4,7 +4,12 @@
 
 
 namespace dac {
-    class DAC8571 {
+    template<typename T>
+    struct DAC {
+        virtual bool write(T) = 0;
+    };
+
+    class DAC8571 : public DAC<uint16_t> {
         static constexpr uint8_t ADDR = 0x4c;
         static constexpr uint8_t SET_CMD = 0x00;
         static constexpr uint8_t SET_UPDATE_CMD = 0x10;
@@ -22,13 +27,12 @@ namespace dac {
                 i2c.begin();
             }
             
-            inline bool dacWrite(uint16_t val) {
+            inline bool write(uint16_t val) override {
                 i2c.beginTransmission(ADDR);
                 i2c.write(SET_UPDATE_CMD);
                 i2c.write(val & 0x00ff >> 0);
                 i2c.write(val & 0xff00 >> 8);
-                i2c.endTransmission();
-                return true;
+                return !i2c.endTransmission();
             };
     };
 }

@@ -115,9 +115,10 @@
 
 
 #include <Arduino.h>
-#include "helper/pin_defs.hpp"
-#include "helper/helper.hpp"
-#include "dac/dac.hpp"
+#include <dac.hpp>
+#include <adc.hpp>
+#include <pin_defs.hpp>
+#include <helper.hpp>
 
 #define EVER ;;
 
@@ -145,16 +146,14 @@ void stopISR() {
     digitalWrite((uint8_t) Pinout::RUN_SW_LED, LOW);
 }
 
-auto controllerOut = dac::DAC8571((uint8_t) Pinout::SDA, (uint8_t) Pinout::SCL, 0u);
+// auto controllerOut = dac::DAC8571((uint8_t) Pinout::SDA, (uint8_t) Pinout::SCL, 0u);
+auto controllerIn = adc::MCP3428((uint8_t) Pinout::SDA, (uint8_t) Pinout::SCL, 0u);
 
 void setup() {
     helpers::initAll();
     
     attachInterrupt((uint8_t) Pinout::RUN_SW, runISR, FALLING);
     attachInterrupt((uint8_t) Pinout::STOP_SW, stopISR, FALLING);
-
-    Wire.setPins(20, 21);
-    Wire.begin();
 }
 
 void loop() {
@@ -162,10 +161,12 @@ void loop() {
     // digitalWrite((uint8_t) Pinout::REMOTE_TRIGGER_LV, HIGH);
     // delay(2000);
     // digitalWrite((uint8_t) Pinout::REMOTE_TRIGGER_LV, LOW);
-    static uint16_t i = 0;
-    printf("%d\n", i);
-    controllerOut.dacWrite(i);
+    // static uint16_t i = 0;
+    // printf("%d\n", i);
+    // controllerOut.write(i);
 
-    delay(1);
-    i+=5;
+    delay(1000);
+    // i+=5;
+
+    printf("ADC: %d\n", controllerIn.read());
 }
