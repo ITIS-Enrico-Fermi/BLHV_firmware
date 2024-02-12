@@ -1,5 +1,6 @@
 #pragma once
 #include <Arduino.h>
+#include <Wire.h>
 #include "pin_defs.hpp"
 
 namespace helpers {
@@ -21,5 +22,8 @@ namespace helpers {
         digitalWrite((uint8_t) Pinout::BUZZER, LOW);
         digitalWrite((uint8_t) Pinout::RUN_SW_LED, LOW);
         digitalWrite((uint8_t) Pinout::REMOTE_TRIGGER_LV, LOW);
+    
+        Wire.setPins((uint8_t) Pinout::SDA, (uint8_t) Pinout::SCL);
+        Wire.begin();
     }
 }

@@ -19,14 +19,17 @@ namespace adc {
         
         private:
             uint8_t sdaPin, sclPin;
-            TwoWire i2c;
+            TwoWire *i2c;
         
         public:
             inline MCP3428(uint8_t sdaPin, uint8_t sclPin, uint8_t busNum) :
-                sdaPin(sdaPin), sclPin(sclPin), i2c(TwoWire(busNum)) {
-                    i2c.setPins(sdaPin, sclPin);
-                    i2c.begin();
+                sdaPin(sdaPin), sclPin(sclPin) {
+                    i2c = new TwoWire(busNum);
+                    i2c->setPins(sdaPin, sclPin);
+                    i2c->begin();
             }
+
+            inline MCP3428(TwoWire i2c) : i2c(&i2c) {}
 
             inline bool config(Channel c, Mode m, Resolution r, Gain g) {
                 const uint8_t CONF =
@@ -35,17 +38,17 @@ namespace adc {
                     | ((uint8_t) m << 4)
                     | ((uint8_t) r << 2)
                     | (uint8_t) g;
-                i2c.beginTransmission(ADDR);
-                i2c.write(CONF);
-                return !i2c.endTransmission();
+                i2c->beginTransmission(ADDR);
+                i2c->write(CONF);
+                return !i2c->endTransmission();
             }
 
             inline uint16_t read() override {
                 config(Channel::CH_1, Mode::ONE_SHOT, Resolution::BITS_16, Gain::GAIN_8);
                 constexpr uint8_t BYTES = 3;  // MSB, LSB, config
                 uint8_t bytes[BYTES];
-                i2c.requestFrom(ADDR, BYTES);
-                i2c.readBytes(bytes, BYTES);
+                i2c->requestFrom(ADDR, BYTES);
+                i2c->readBytes(bytes, BYTES);
                 return (bytes[0] << 8) | bytes[1];
             }
     };

@@ -17,22 +17,26 @@ namespace dac {
         
         private:
             uint8_t sdaPin, sclPin;
-            TwoWire i2c;
+            TwoWire *i2c;
 
         public:
             inline DAC8571(uint8_t sdaPin, uint8_t sclPin, uint8_t busNum) :
-                sdaPin(sdaPin), sclPin(sclPin), i2c(TwoWire(busNum)) {
-                i2c.setPins(sdaPin, sclPin);
-                i2c.setClock(100e3);
-                i2c.begin();
+                sdaPin(sdaPin), sclPin(sclPin) {
+                i2c = new TwoWire(busNum);
+                i2c->setPins(sdaPin, sclPin);
+                i2c->setClock(100e3);
+                i2c->begin();
             }
+
+            inline DAC8571(TwoWire i2c) : i2c(&i2c) {}
+
             
             inline bool write(uint16_t val) override {
-                i2c.beginTransmission(ADDR);
-                i2c.write(SET_UPDATE_CMD);
-                i2c.write(val & 0x00ff >> 0);
-                i2c.write(val & 0xff00 >> 8);
-                return !i2c.endTransmission();
+                i2c->beginTransmission(ADDR);
+                i2c->write(SET_UPDATE_CMD);
+                i2c->write(val & 0x00ff >> 0);
+                i2c->write(val & 0xff00 >> 8);
+                return !i2c->endTransmission();
             };
     };
 }
