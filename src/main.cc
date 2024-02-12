@@ -87,9 +87,6 @@ void setup() {
 
     Serial.begin(115200);
     display.setup();
-
-    display.test();
-
     display.getHardwareHandle().clear();
 
     Screen *current_screen = new Screens::StatusMonitor(display);
@@ -97,7 +94,7 @@ void setup() {
         .running = true,
         .input_val = 100,
         .output_val = 100,
-        .program = 2
+        .program = 0
     };
     current_screen->update((void *)&mainscreenstatus);
 
@@ -121,6 +118,9 @@ void setup() {
 
         dac_write(dac_val);
 
+        mainscreenstatus.input_val = adc_val;
+        mainscreenstatus.output_val = dac_val;
+        current_screen->update(&mainscreenstatus);
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
