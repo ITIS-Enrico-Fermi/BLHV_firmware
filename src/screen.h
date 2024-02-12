@@ -19,6 +19,10 @@ protected:
     Display &display;
     Screen(Display &d): display(d) {}
 public:
+    virtual void begin() {
+        display.getHardwareHandle().clear();
+    }
+
     /**
      * Update the display, and the internal status. An opaque pointer is passed with all the necessary
      * data that is specified by the application.

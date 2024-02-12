@@ -12,6 +12,7 @@ namespace HMI {
         PROGRAM2,
         PROGRAM3,
         START,
-        STOP
+        STOP,
+        NONE
     };
 }

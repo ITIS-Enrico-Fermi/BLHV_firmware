@@ -19,6 +19,9 @@
 
 #include "screen.h"
 #include "screen_statusmonitor.h"
+#include "screen_settings.h"
+
+#include "key.h"
 
 #define TFT_CS         14
 #define TFT_RST        15
@@ -72,6 +75,16 @@ float pid_compensator(float setpoint, float processvar) {
     return clamp(prop + integ + deriv, pid_tuning.sat_min, pid_tuning.sat_max);
 }
 
+HMI::Action readButton() {
+    if (digitalRead(12) == 0)
+        return HMI::Action::KNOB_CLOCKWISE;
+    if (digitalRead(13) == 0)
+        return HMI::Action::KNOB_COUNTERCLOCKWISE;
+    if (digitalRead(14) == 0)
+        return HMI::Action::KNOB_CLICK;
+    return HMI::Action::NONE;
+}
+
 void setup() {
     float adc_val_normalized;
     int dac_val, adc_val;
@@ -98,6 +111,16 @@ void setup() {
     };
     current_screen->update((void *)&mainscreenstatus);
 
+    Screen *menu = new Screens::Settings(display);
+    current_screen = menu;
+    current_screen->begin();
+
+    pinMode(12, INPUT);
+    pinMode(13, INPUT);
+    pinMode(14, INPUT);
+
+    HMI::Action btn_stat;
+
     while (true) {
         read_bytes = Serial.readBytes(incoming, 100);
 
@@ -120,6 +143,14 @@ void setup() {
 
         mainscreenstatus.input_val = adc_val;
         mainscreenstatus.output_val = dac_val;
+
+        btn_stat = readButton();
+
+        Serial.println(digitalRead(12));
+        Serial.println(digitalRead(13));
+        Serial.println(digitalRead(14));
+
+        current_screen->signal(btn_stat);
         current_screen->update(&mainscreenstatus);
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
