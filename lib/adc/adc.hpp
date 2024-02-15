@@ -44,7 +44,7 @@ namespace adc {
             }
 
             inline uint16_t read() override {
-                config(Channel::CH_1, Mode::ONE_SHOT, Resolution::BITS_16, Gain::GAIN_8);
+                config(Channel::CH_1, Mode::ONE_SHOT, Resolution::BITS_16, Gain::GAIN_1);
                 constexpr uint8_t BYTES = 3;  // MSB, LSB, config
                 uint8_t bytes[BYTES];
                 i2c->requestFrom(ADDR, BYTES);
@@ -52,7 +52,7 @@ namespace adc {
 
                 uint16_t val = (bytes[0] << 8) | bytes[1];
 
-                return val > 32767 ? val - 65533 : val;
+                return val;
             }
     };
 }

@@ -7,32 +7,28 @@
 
 namespace controls {
     template<typename T>
-    struct Controller {
-        virtual void setProcessVar(T procVar) = 0;
-        virtual void setTarget(T target) = 0;
-        virtual T getCompensation() = 0;
+    class Controller {
+        protected:
+            adc::ADC<uint16_t> *adc;
+            dac::DAC<uint16_t> *dac;
+        
+        public:
+            Controller(adc::ADC<uint16_t> *adc, dac::DAC<uint16_t> *dac) : adc(adc), dac(dac) {};
+            void loopAsync();
     };
 
     struct PID : public Controller<uint16_t> {
-        private:
-            adc::ADC<uint16_t> *adc;
-            dac::DAC<uint16_t> *dac;
-
         public:
-            PID(adc::ADC<uint16_t> *adc, dac::DAC<uint16_t> *dac) : adc(adc), dac(dac) {};
+            using Controller<uint16_t>::Controller;
 
-            void setProcessVar(uint16_t pv) {}
-            void setTarget(uint16_t pv) {}
-
-            uint16_t getCompensation() {
-                // ATM just a mock
-                static uint16_t i = 0;
-                printf("%d\n", i);
-                dac->write(i);
-                i+=5;
+            void loopAsync() {
+                // // ATM just a mock
+                // static uint16_t i = 0;
+                // printf("%d\n", i);
+                // dac->write(i);
+                // i+=5;
 
                 printf("ADC: %d\n", adc->read());
-                return 0;
             }
     };
 }

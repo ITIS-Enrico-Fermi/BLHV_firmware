@@ -125,27 +125,37 @@
 #define EVER ;;
 
 void buzzTask(void *pvParams) {
+    static auto inUse = xSemaphoreCreateBinary();
+
+    if (inUse != nullptr and xSemaphoreTake(inUse, 0) == pdTRUE) vTaskDelete(nullptr);
+
     auto startTick = xTaskGetTickCount();
-
-    for (EVER) {
-        auto currentTick = xTaskGetTickCount();
-        if ((currentTick - startTick) >= pdMS_TO_TICKS(200)) vTaskDelete(nullptr);
-
+    while ((xTaskGetTickCount() - startTick) <= pdMS_TO_TICKS(200)) {
         digitalWrite((uint8_t) Pinout::BUZZER, HIGH);
         vTaskDelay(pdMS_TO_TICKS(1));
         digitalWrite((uint8_t) Pinout::BUZZER, LOW);
         vTaskDelay(pdMS_TO_TICKS(1));
     }
+
+    xSemaphoreGive(inUse);
+    vTaskDelete(nullptr);
 }
 
-void runISR() {
-    // digitalWrite((uint8_t) Pinout::RUN_SW_LED, !digitalRead((uint8_t) Pinout::RUN_SW_LED));
-    digitalWrite((uint8_t) Pinout::RUN_SW_LED, HIGH);
-    xTaskCreate(buzzTask, "buzzTask", 512, nullptr, 5, nullptr);
-}
+void triggerTask(void *pvParams) {
+    static auto inUse = xSemaphoreCreateBinary();
+    constexpr auto interTimeMs = 3e3;
 
-void stopISR() {
-    digitalWrite((uint8_t) Pinout::RUN_SW_LED, LOW);
+    if (inUse != nullptr and xSemaphoreTake(inUse, 0) == pdTRUE) vTaskDelete(nullptr);
+
+    digitalWrite((uint8_t) Pinout::REMOTE_TRIGGER_LV, LOW);
+    vTaskDelay(pdMS_TO_TICKS(interTimeMs));
+    digitalWrite((uint8_t) Pinout::REMOTE_TRIGGER_LV, HIGH);
+    vTaskDelay(pdMS_TO_TICKS(interTimeMs));
+    digitalWrite((uint8_t) Pinout::REMOTE_TRIGGER_LV, LOW);
+    vTaskDelay(pdMS_TO_TICKS(interTimeMs));
+
+    xSemaphoreGive(inUse);
+    vTaskDelete(nullptr);
 }
 
 controls::PID *pid = nullptr;
@@ -153,8 +163,18 @@ controls::PID *pid = nullptr;
 void setup() {
     helpers::initAll();
     
-    // attachInterrupt((uint8_t) Pinout::RUN_SW, runISR, FALLING);
-    // attachInterrupt((uint8_t) Pinout::STOP_SW, stopISR, FALLING);
+    attachInterrupt((uint8_t) Pinout::RUN_SW, [](){
+        digitalWrite((uint8_t) Pinout::RUN_SW_LED, HIGH);
+        xTaskCreate(buzzTask, "buzzTask", 512, nullptr, 5, nullptr);
+    }, FALLING);
+
+    attachInterrupt((uint8_t) Pinout::STOP_SW, [](){
+        digitalWrite((uint8_t) Pinout::RUN_SW_LED, LOW);
+    }, FALLING);
+   
+    attachInterrupt((uint8_t) Pinout::REMOTE_TRIGGER_SW, [](){
+        xTaskCreate(triggerTask, "triggerTask", 512, nullptr, 2, nullptr);
+    }, FALLING);
 
     auto controllerOut = new dac::DAC8571(Wire);
     auto controllerIn = new adc::MCP3428(Wire);
@@ -167,6 +187,6 @@ void loop() {
     // delay(2000);
     // digitalWrite((uint8_t) Pinout::REMOTE_TRIGGER_LV, LOW);
 
-    pid->getCompensation();
+    pid->loopAsync();
     delay(100);
 }
