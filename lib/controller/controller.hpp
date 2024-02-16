@@ -28,8 +28,9 @@ namespace controls {
                 // // ATM just a mock
                 // static uint16_t i = 0;
                 // printf("%d\n", i);
-                dac->write(1);
                 // i += 1e3;
+
+                dac->write(1);  // Testing DAC granularity
 
                 printf("ADC: %d\n", adc->read());
             }
