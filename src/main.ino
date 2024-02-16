@@ -126,6 +126,7 @@
 
 void buzzTask(void *pvParams) {
     static auto inUse = xSemaphoreCreateBinary();
+    constexpr auto debounceTime = 1e3;
 
     if (inUse != nullptr and xSemaphoreTake(inUse, 0) == pdTRUE) vTaskDelete(nullptr);
 
@@ -137,22 +138,19 @@ void buzzTask(void *pvParams) {
         vTaskDelay(pdMS_TO_TICKS(1));
     }
 
+    vTaskDelay(debounceTime);
     xSemaphoreGive(inUse);
     vTaskDelete(nullptr);
 }
 
 void triggerTask(void *pvParams) {
     static auto inUse = xSemaphoreCreateBinary();
-    constexpr auto interTimeMs = 3e3;
+    constexpr auto debounceTime = 1e3;
 
     if (inUse != nullptr and xSemaphoreTake(inUse, 0) == pdTRUE) vTaskDelete(nullptr);
 
-    digitalWrite((uint8_t) Pinout::REMOTE_TRIGGER_LV, LOW);
-    vTaskDelay(pdMS_TO_TICKS(interTimeMs));
     digitalWrite((uint8_t) Pinout::REMOTE_TRIGGER_LV, HIGH);
-    vTaskDelay(pdMS_TO_TICKS(interTimeMs));
-    digitalWrite((uint8_t) Pinout::REMOTE_TRIGGER_LV, LOW);
-    vTaskDelay(pdMS_TO_TICKS(interTimeMs));
+    vTaskDelay(pdMS_TO_TICKS(debounceTime));
 
     xSemaphoreGive(inUse);
     vTaskDelete(nullptr);
@@ -170,6 +168,7 @@ void setup() {
 
     attachInterrupt((uint8_t) Pinout::STOP_SW, [](){
         digitalWrite((uint8_t) Pinout::RUN_SW_LED, LOW);
+        digitalWrite((uint8_t) Pinout::REMOTE_TRIGGER_LV, LOW);
     }, FALLING);
    
     attachInterrupt((uint8_t) Pinout::REMOTE_TRIGGER_SW, [](){
@@ -188,5 +187,5 @@ void loop() {
     // digitalWrite((uint8_t) Pinout::REMOTE_TRIGGER_LV, LOW);
 
     pid->loopAsync();
-    delay(100);
+    delay(3e3);
 }

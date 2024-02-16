@@ -32,10 +32,11 @@ namespace dac {
 
             
             inline bool write(uint16_t val) override {
+                printf("DAC: %d\n", val);
                 i2c->beginTransmission(ADDR);
                 i2c->write(SET_UPDATE_CMD);
-                i2c->write(val & 0x00ff >> 0);
-                i2c->write(val & 0xff00 >> 8);
+                i2c->write((val & 0x00ff) >> 0);
+                i2c->write((val & 0xff00) >> 8);
                 return !i2c->endTransmission();
             };
     };

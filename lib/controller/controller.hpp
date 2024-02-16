@@ -22,11 +22,14 @@ namespace controls {
             using Controller<uint16_t>::Controller;
 
             void loopAsync() {
+                constexpr auto Inom = 20;  // Amp
+                constexpr double Vscale = 10.f/12.f;
+
                 // // ATM just a mock
                 // static uint16_t i = 0;
                 // printf("%d\n", i);
-                // dac->write(i);
-                // i+=5;
+                dac->write(1);
+                // i += 1e3;
 
                 printf("ADC: %d\n", adc->read());
             }
