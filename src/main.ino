@@ -8,7 +8,7 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-// #include "esp_log.h"
+#include "esp_log.h"
 // #include "hal/adc_types.h"
 // #include "driver/uart.h"
 
@@ -113,7 +113,6 @@
 // }
 
 
-
 #include <Arduino.h>
 #include <Wire.h>
 #include <dac.hpp>
@@ -123,6 +122,11 @@
 #include <helper.hpp>
 
 #define EVER ;;
+
+constexpr auto ENDODER_SCALE_K = 50;
+controls::PID *pid = nullptr;
+uint16_t target = 0;
+bool ramp = false, hold = false;
 
 void buzzTask(void *pvParams) {
     static auto inUse = xSemaphoreCreateBinary();
@@ -143,37 +147,42 @@ void buzzTask(void *pvParams) {
     vTaskDelete(nullptr);
 }
 
-void triggerTask(void *pvParams) {
-    static auto inUse = xSemaphoreCreateBinary();
-    constexpr auto debounceTime = 1e3;
-
-    if (inUse != nullptr and xSemaphoreTake(inUse, 0) == pdTRUE) vTaskDelete(nullptr);
-
-    digitalWrite((uint8_t) Pinout::REMOTE_TRIGGER_LV, HIGH);
-    vTaskDelay(pdMS_TO_TICKS(debounceTime));
-
-    xSemaphoreGive(inUse);
-    vTaskDelete(nullptr);
-}
-
-controls::PID *pid = nullptr;
 
 void setup() {
     helpers::initAll();
+    esp_log_level_set("*", ESP_LOG_DEBUG);
     
     attachInterrupt((uint8_t) Pinout::RUN_SW, [](){
+        // Switch from manual to auto mode: sample Spellman DAC and hold via SPS30 
         digitalWrite((uint8_t) Pinout::RUN_SW_LED, HIGH);
         xTaskCreate(buzzTask, "buzzTask", 512, nullptr, 5, nullptr);
+        ramp = true;
+        hold = false;
     }, FALLING);
 
     attachInterrupt((uint8_t) Pinout::STOP_SW, [](){
+        // Switch from auto to manual mode
         digitalWrite((uint8_t) Pinout::RUN_SW_LED, LOW);
         digitalWrite((uint8_t) Pinout::REMOTE_TRIGGER_LV, LOW);
+        ramp = true;
+        hold = false;
     }, FALLING);
    
     attachInterrupt((uint8_t) Pinout::REMOTE_TRIGGER_SW, [](){
-        xTaskCreate(triggerTask, "triggerTask", 512, nullptr, 2, nullptr);
+        digitalWrite((uint8_t) Pinout::REMOTE_TRIGGER_LV, HIGH);
     }, FALLING);
+
+    attachInterrupt((uint8_t) Pinout::ENCODER_SW, [](){
+        ramp = false;
+        hold = true;
+    }, FALLING);
+
+    attachInterrupt((uint8_t) Pinout::ROT_ENC_A, [](){
+        // auto dir = digitalRead((uint8_t) Pinout::ROT_ENC_B);
+        auto dir = 1;
+        target += dir;
+    }, FALLING);
+
 
     auto controllerOut = new dac::DAC8571(Wire);
     auto controllerIn = new adc::MCP3428(Wire);
@@ -186,6 +195,10 @@ void loop() {
     // delay(2000);
     // digitalWrite((uint8_t) Pinout::REMOTE_TRIGGER_LV, LOW);
 
-    pid->loopAsync();
-    delay(3e3);
+    if (ramp)
+        pid->rampAsync(target * ENDODER_SCALE_K);
+    
+    if (hold)
+        pid->holdAsync(target * ENDODER_SCALE_K);
+    delay(1e2);
 }

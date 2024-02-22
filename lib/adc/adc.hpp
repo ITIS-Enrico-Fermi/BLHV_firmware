@@ -2,6 +2,8 @@
 
 #include <Wire.h>
 #include <cassert>
+#include "esp_log.h"
+
 
 namespace adc {
     template<typename T>
@@ -52,6 +54,8 @@ namespace adc {
 
                 uint16_t val = (bytes[0] << 8) | bytes[1];
 
+                // ESP_LOGI("ADC", "ADC reading: %d", val);
+                printf("ADC reading: %d\n", val);
                 return val;
             }
     };

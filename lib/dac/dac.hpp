@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Wire.h>
-
+#include "esp_log.h"
 
 namespace dac {
     template<typename T>
@@ -32,7 +32,8 @@ namespace dac {
 
             
             inline bool write(uint16_t val) override {
-                printf("DAC: %d\n", val);
+                // ESP_LOGI("DAC", "DAC writing: %d", val);
+                printf("DAC writing: %d\n", val);
                 i2c->beginTransmission(ADDR);
                 i2c->write(SET_UPDATE_CMD);
                 i2c->write((val & 0xff00) >> 8);
