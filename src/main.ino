@@ -41,11 +41,22 @@ void encoderCallback(bool A, bool B) {
     if (dir > 0 and encoderVal < prevVal) encoderVal = (1 << 16);
 }
 
-void buzzTask(void *pvParams) {
-    static auto inUse = xSemaphoreCreateBinary();
-    constexpr auto debounceTime = 1e3;
+void startCallback() {
+    digitalWrite((uint8_t) Pinout::RUN_SW_LED, HIGH);
+    xTaskCreate(buzzTask, "buzzTask", 1024, nullptr, 5, nullptr);
+    pid->sampleTarget();
+    pid->setOutput(encoderVal);
+    ctrlOn = true;
+}
 
-    if (inUse != nullptr and xSemaphoreTake(inUse, 0) == pdTRUE) vTaskDelete(nullptr);
+void buzzTask(void *pvParams) {
+    static SemaphoreHandle_t inUse = nullptr;
+    if (not inUse) {
+        inUse = xSemaphoreCreateBinary();
+        xSemaphoreGive(inUse);
+    }
+
+    if (inUse != nullptr and xSemaphoreTake(inUse, 0) == pdFALSE) vTaskDelete(nullptr);
 
     auto startTick = xTaskGetTickCount();
     while ((xTaskGetTickCount() - startTick) <= pdMS_TO_TICKS(200)) {
@@ -55,30 +66,17 @@ void buzzTask(void *pvParams) {
         vTaskDelay(pdMS_TO_TICKS(1));
     }
 
-    vTaskDelay(debounceTime);
     xSemaphoreGive(inUse);
     vTaskDelete(nullptr);
 }
 
-void pollingTask(void *pvParams) {
-    static uint16_t bvRemoteTrigger = 0;  /** < Bit Vectors */
-    static uint16_t bvEncoderA = 0;
+void encoderPollingTask(void *pvParams) {
+    static uint16_t bvEncoderA = 0;  /** < Bit Vectors */
     static uint16_t bvEncoderB = 0;
-    static uint16_t bvRun = 0;
-    static uint16_t bvStop = 0;
-    static bool remoteTriggerStatus = false;
-    static bool runStatus = false;
-    static bool stopStatus = false;
     static bool encoderA = false;
     static bool encoderB = false;
 
     for (EVER) {
-        bvRemoteTrigger = (bvRemoteTrigger << 1) | digitalRead((uint8_t) Pinout::REMOTE_TRIGGER_SW) | 0xe000;
-        if (bvRemoteTrigger == 0xf000) {
-            digitalWrite((uint8_t) Pinout::REMOTE_TRIGGER_LV, remoteTriggerStatus ? HIGH : LOW);
-            remoteTriggerStatus = !remoteTriggerStatus;
-        }
-
         bvEncoderA = (bvEncoderA << 1) | digitalRead((uint8_t) Pinout::ROT_ENC_A);
         if ((bvEncoderA | 0xe000) == 0xf000) {
             encoderA = true;
@@ -97,6 +95,25 @@ void pollingTask(void *pvParams) {
             encoderB = false;
         }
 
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
+}
+
+void switchesPollingTask(void *pvParams) {
+    static uint16_t bvRemoteTrigger = 0;  /** < Bit Vectors */
+    static uint16_t bvRun = 0;
+    static uint16_t bvStop = 0;
+    static bool remoteTriggerStatus = false;
+    static bool runStatus = false;
+    static bool stopStatus = false;
+
+    for (EVER) {
+        bvRemoteTrigger = (bvRemoteTrigger << 1) | digitalRead((uint8_t) Pinout::REMOTE_TRIGGER_SW) | 0xe000;
+        if (bvRemoteTrigger == 0xf000) {
+            digitalWrite((uint8_t) Pinout::REMOTE_TRIGGER_LV, remoteTriggerStatus ? HIGH : LOW);
+            remoteTriggerStatus = !remoteTriggerStatus;
+        }
+
         bvRun = (bvRun << 1) | digitalRead((uint8_t) Pinout::RUN_SW) | 0xe000;
         if (bvRun == 0xf000) {
             startPressed = true;
@@ -108,15 +125,32 @@ void pollingTask(void *pvParams) {
             ctrlOn = false;
         }
 
-        vTaskDelay(pdMS_TO_TICKS(1));
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+void mainTask(void *pvParams) {
+    for (EVER) {
+        if (startPressed) {
+            startCallback();
+            startPressed = false;
+        }
+
+        if (ctrlOn) {
+            // encoderVal = pid->loopAsync();
+            vTaskDelay(pdMS_TO_TICKS(1e3));
+        }
+        else {
+            // pid->forward(encoderVal);
+            vTaskDelay(pdMS_TO_TICKS(1e2));
+        }
     }
 }
 
 void setup() {
     helpers::initAll();
     esp_log_level_set("*", ESP_LOG_DEBUG);
-    ctrlOn = false;
-    startPressed = false;
+    ctrlOn = startPressed = false;
     
     auto controllerOut = new dac::DAC8571(Wire);
     auto controllerIn = new adc::MCP3428(Wire);
@@ -131,25 +165,11 @@ void setup() {
         .compMax = 0.00002
     });
 
-    xTaskCreatePinnedToCore(pollingTask, "pollingTask", 1024, nullptr, 1, nullptr, CORE_ID_PRO);
+    xTaskCreatePinnedToCore(mainTask, "mainTask", 4096, nullptr, 1, nullptr, CORE_ID_APP);
+    xTaskCreatePinnedToCore(encoderPollingTask, "encoderPollingTask", 2048, nullptr, 2, nullptr, CORE_ID_PRO);
+    xTaskCreatePinnedToCore(switchesPollingTask, "switchesPollingTask", 2048, nullptr, 3, nullptr, CORE_ID_PRO);
 }
 
 void loop() {
-    if (startPressed) {
-        digitalWrite((uint8_t) Pinout::RUN_SW_LED, HIGH);
-        xTaskCreate(buzzTask, "buzzTask", 512, nullptr, 5, nullptr);
-        pid->sampleTarget();
-        pid->setOutput(encoderVal);
-        ctrlOn = true;
-        startPressed = false;
-    }
-
-    if (ctrlOn) {
-        encoderVal = pid->loopAsync();
-        vTaskDelay(pdMS_TO_TICKS(1e3));
-    }
-    else {
-        pid->forward(encoderVal);
-        vTaskDelay(pdMS_TO_TICKS(1e2));
-    }
+    vTaskDelay(pdMS_TO_TICKS(1e2));
 }
