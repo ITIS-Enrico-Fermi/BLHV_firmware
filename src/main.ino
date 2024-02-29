@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <float.h>
 #include <atomic>
+#include <iostream>
 
 #include <Arduino.h>
 #include <Wire.h>
@@ -27,6 +28,19 @@ std::atomic<bool> ctrlOn, startPressed;
 uint16_t encoderVal = 0;
 // float target = 0.318; // < target current measured in ADC units
 
+/**
+ * @param dir Rotation direction of the encoder. In (-1 | 1)
+*/
+void encoderCallback(bool A, bool B) {
+    auto dir = 1;
+    if (A == B) dir = -1;
+
+    auto prevVal = encoderVal;
+    encoderVal += dir * ENDODER_INCREMENT;
+    if (dir < 0 and encoderVal > prevVal) encoderVal = 0;
+    if (dir > 0 and encoderVal < prevVal) encoderVal = (1 << 16);
+}
+
 void buzzTask(void *pvParams) {
     static auto inUse = xSemaphoreCreateBinary();
     constexpr auto debounceTime = 1e3;
@@ -47,16 +61,16 @@ void buzzTask(void *pvParams) {
 }
 
 void pollingTask(void *pvParams) {
-    static uint16_t bvRemoteTrigger = 0;
-    static uint16_t bvEncoderClk = 0;
-    static uint16_t bvEncoderData = 0;
+    static uint16_t bvRemoteTrigger = 0;  /** < Bit Vectors */
+    static uint16_t bvEncoderA = 0;
+    static uint16_t bvEncoderB = 0;
     static uint16_t bvRun = 0;
     static uint16_t bvStop = 0;
     static bool remoteTriggerStatus = false;
     static bool runStatus = false;
     static bool stopStatus = false;
-    static bool encoderClkStatus = false;
-    static bool encoderDataStatus = false;
+    static bool encoderA = false;
+    static bool encoderB = false;
 
     for (EVER) {
         bvRemoteTrigger = (bvRemoteTrigger << 1) | digitalRead((uint8_t) Pinout::REMOTE_TRIGGER_SW) | 0xe000;
@@ -65,38 +79,36 @@ void pollingTask(void *pvParams) {
             remoteTriggerStatus = !remoteTriggerStatus;
         }
 
-        bvEncoderClk = (bvEncoderClk << 1) | digitalRead((uint8_t) Pinout::ROT_ENC_A) | 0xe000;
-        if (bvEncoderClk == 0xf000) {
-            auto dir = encoderDataStatus ? -1 : 1;
-            auto prevVal = encoderVal;
-            encoderVal += dir * ENDODER_INCREMENT;
-            if (dir < 0 and encoderVal > prevVal) encoderVal = 0;
-            if (dir > 0 and encoderVal < prevVal) encoderVal = (1 << 16);
-            encoderClkStatus = !encoderClkStatus;
+        bvEncoderA = (bvEncoderA << 1) | digitalRead((uint8_t) Pinout::ROT_ENC_A);
+        if ((bvEncoderA | 0xe000) == 0xf000) {
+            encoderA = true;
+            encoderCallback(encoderA, encoderB);
+        }
+        else if (bvEncoderA == 0x0001) {
+            encoderA = false;
+            encoderCallback(encoderA, encoderB);
         }
 
-        bvEncoderData = (bvEncoderData << 1) | digitalRead((uint8_t) Pinout::ROT_ENC_B);
-        if ((bvEncoderData | 0xe000) == 0xf000) {
-            encoderDataStatus = true;
+        bvEncoderB = (bvEncoderB << 1) | digitalRead((uint8_t) Pinout::ROT_ENC_B);
+        if ((bvEncoderB | 0xe000) == 0xf000) {
+            encoderB = true;
         }
-        else if ((bvEncoderData & 0xfff4) == 0xfff0) {
-            encoderDataStatus = false;
+        else if (bvEncoderB == 0x0001) {
+            encoderB = false;
         }
 
         bvRun = (bvRun << 1) | digitalRead((uint8_t) Pinout::RUN_SW) | 0xe000;
         if (bvRun == 0xf000) {
             startPressed = true;
-            runStatus = !runStatus;
         }
 
         bvStop = (bvStop << 1) | digitalRead((uint8_t) Pinout::STOP_SW) | 0xe000;
         if (bvStop == 0xf000) {
             digitalWrite((uint8_t) Pinout::RUN_SW_LED, LOW);
             ctrlOn = false;
-            stopStatus = !stopStatus;
         }
 
-        vTaskDelay(pdMS_TO_TICKS(3));
+        vTaskDelay(pdMS_TO_TICKS(1));
     }
 }
 
@@ -119,7 +131,7 @@ void setup() {
         .compMax = 0.00002
     });
 
-    xTaskCreate(pollingTask, "pollingTask", 512, nullptr, 1, nullptr);
+    xTaskCreatePinnedToCore(pollingTask, "pollingTask", 1024, nullptr, 1, nullptr, CORE_ID_PRO);
 }
 
 void loop() {
@@ -129,16 +141,15 @@ void loop() {
         pid->sampleTarget();
         pid->setOutput(encoderVal);
         ctrlOn = true;
-        vTaskDelay(3e2);
         startPressed = false;
     }
 
     if (ctrlOn) {
         encoderVal = pid->loopAsync();
-        delay(1e3);
+        vTaskDelay(pdMS_TO_TICKS(1e3));
     }
     else {
         pid->forward(encoderVal);
-        delay(1e2);
+        vTaskDelay(pdMS_TO_TICKS(1e2));
     }
 }
