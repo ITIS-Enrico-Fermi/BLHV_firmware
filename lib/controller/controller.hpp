@@ -72,7 +72,11 @@ namespace controls {
                     prop + integral + deriv,
                     this->tuning.compMin, this->tuning.compMax
                 );
-                output += compensation;
+                
+                output = clamp(
+                    output + compensation,
+                    0, 1
+                );
 
                 uint16_t dac_out = output * (1 << 16);
 

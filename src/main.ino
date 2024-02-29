@@ -137,11 +137,11 @@ void mainTask(void *pvParams) {
         }
 
         if (ctrlOn) {
-            // encoderVal = pid->loopAsync();
+            encoderVal = pid->loopAsync();
             vTaskDelay(pdMS_TO_TICKS(1e3));
         }
         else {
-            // pid->forward(encoderVal);
+            pid->forward(encoderVal);
             vTaskDelay(pdMS_TO_TICKS(1e2));
         }
     }
