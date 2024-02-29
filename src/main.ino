@@ -111,7 +111,7 @@ void setup() {
     pid = new controls::PID(controllerIn, controllerOut);
     pid->setTuning((controls::PidTuning) {
         .kp = 0.05,
-        .ki = 0,
+        .ki = 0,  // TODO: real-life testing demostrates oscillation with 1e-9. Fix it
         .kd = 0.05,
         .satMin = -1e-2,
         .satMax = 1e-2,
