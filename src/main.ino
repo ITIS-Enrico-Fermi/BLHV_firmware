@@ -3,130 +3,29 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <float.h>
-
-#include "sdkconfig.h"
-
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "esp_log.h"
-// #include "hal/adc_types.h"
-// #include "driver/uart.h"
-
-// #include "adc/adc.h"
-// #include "dac/dac.h"
-// #include "utils/utils.h"
-
-
-// static float target = 0.17; // < target current measured in ADC units
-// static struct {
-//     float kp;
-//     float ki;
-//     float kd;
-//     float sat_min; /** Saturation lower bound */
-//     float sat_max; /** Saturation upper bound */
-// } pid_tuning = {
-//     .kp = 0.05,
-//     .ki = 0.002,
-//     .kd = 0,
-//     .sat_min = -0.235,
-//     .sat_max = 0.235
-// };
-
-// /**
-//  * Compute actuator output to reach the set pouint8_t.
-//  *
-//  * @param setpouint8_t the desidered value to reach
-//  * @param processvar current process variable value, in the same unit as setpouint8_t
-//  * @return an uint8_teger representing actuator output, to be converted to a suitable unit
-//  * for your actuator. Unit: same as input.
-//  */
-// float pid_compensator(float setpouint8_t, float processvar) {
-//     // State variables
-//     float error = setpouint8_t - processvar; // < e(t) = error at current time
-//     static float uint8_tegralerror = 0;
-//     static float lasterror = 0;
-//     static float output = 0;
-
-//     // Proportional component
-//     float prop = pid_tuning.kp * error;
-
-//     // uint8_tegral component
-//     if (output > pid_tuning.sat_min && output < pid_tuning.sat_max) {
-//         uint8_tegralerror += error;
-//     }
-//     float uint8_teg = pid_tuning.ki * uint8_tegralerror;
-
-//     // Derivative component
-//     float deriv = pid_tuning.kd * (error - lasterror);
-//     lasterror = error;
-
-//     output = prop + uint8_teg + deriv;
-//     return clamp(output, pid_tuning.sat_min, pid_tuning.sat_max);
-// }
-
-// float adc_val_normalized;
-// uint8_t dac_val, adc_val;
-// float pid_out;
-
-// uint8_t read_bytes;
-// char incoming[100];
-
-// void setup() {
-//     adc_setup();
-//     dac_setup();
-
-//     // uart_config_t uart_conf = {
-//     //     .baud_rate = 115200,
-//     //     .data_bits = UART_DATA_8_BITS,
-//     //     .parity = UART_PARITY_DISABLE,
-//     //     .stop_bits = UART_STOP_BITS_1,
-//     //     .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-//     //     .rx_flow_ctrl_thresh = 122,
-//     //     .source_clk = UART_SCLK_DEFAULT
-//     // };
-//     // ESP_ERROR_CHECK(uart_param_config(UART_NUM_0, &uart_conf));
-//     // ESP_ERROR_CHECK(uart_set_pin(UART_NUM_0, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, 18, 19));
-//     // ESP_ERROR_CHECK(uart_driver_install(UART_NUM_0, 2048, 2048, 10, NULL, 0));
-// }
-
-// void loop() {
-//     // read_bytes = uart_read_bytes(UART_NUM_0, incoming, 15, 10 / portTICK_PERIOD_MS);
-
-//     // if (read_bytes > 0) {
-//     //     sscanf(incoming, "%f%f%f", &pid_tuning.kp, &pid_tuning.ki, &pid_tuning.kd);
-//     //     ESP_LOGI("Tuner", "Read parameters: %.2f, %.2f, %.2f", pid_tuning.kp, pid_tuning.ki, pid_tuning.kd);
-//     // }
-
-//     adc_val = adc_read();
-//     adc_val_normalized = clamp(
-//         normalize(adc_val, 0, 1 << 12),
-//         0, 1
-//     );
-
-//     pid_out = pid_compensator(target, adc_val_normalized);
-//     dac_val = pid_out * 255;
-//     ESP_LOGI("PID", "Reading: %d, %.5f. Output: %d, %.2f", adc_val, adc_val_normalized, dac_val, pid_out);
-
-//     dac_write(dac_val);
-
-//     vTaskDelay(100 / portTICK_PERIOD_MS);
-// }
-
+#include <atomic>
 
 #include <Arduino.h>
 #include <Wire.h>
+
 #include <dac.hpp>
 #include <adc.hpp>
 #include <controller.hpp>
 #include <pin_defs.hpp>
 #include <helper.hpp>
 
+#include "sdkconfig.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_log.h"
+
 #define EVER ;;
 
-constexpr auto ENDODER_SCALE_K = 50;
+constexpr auto ENDODER_INCREMENT = 50;
 controls::PID *pid = nullptr;
-uint16_t target = 0;
-bool ramp = false, hold = false;
+std::atomic<bool> ctrlOn, startPressed;
+uint16_t encoderVal = 0;
+// float target = 0.318; // < target current measured in ADC units
 
 void buzzTask(void *pvParams) {
     static auto inUse = xSemaphoreCreateBinary();
@@ -147,58 +46,99 @@ void buzzTask(void *pvParams) {
     vTaskDelete(nullptr);
 }
 
+void pollingTask(void *pvParams) {
+    static uint16_t bvRemoteTrigger = 0;
+    static uint16_t bvEncoderClk = 0;
+    static uint16_t bvEncoderData = 0;
+    static uint16_t bvRun = 0;
+    static uint16_t bvStop = 0;
+    static bool remoteTriggerStatus = false;
+    static bool runStatus = false;
+    static bool stopStatus = false;
+    static bool encoderClkStatus = false;
+    static bool encoderDataStatus = false;
+
+    for (EVER) {
+        bvRemoteTrigger = (bvRemoteTrigger << 1) | digitalRead((uint8_t) Pinout::REMOTE_TRIGGER_SW) | 0xe000;
+        if (bvRemoteTrigger == 0xf000) {
+            digitalWrite((uint8_t) Pinout::REMOTE_TRIGGER_LV, remoteTriggerStatus ? HIGH : LOW);
+            remoteTriggerStatus = !remoteTriggerStatus;
+        }
+
+        bvEncoderClk = (bvEncoderClk << 1) | digitalRead((uint8_t) Pinout::ROT_ENC_A) | 0xe000;
+        if (bvEncoderClk == 0xf000) {
+            auto dir = encoderDataStatus ? -1 : 1;
+            auto prevVal = encoderVal;
+            encoderVal += dir * ENDODER_INCREMENT;
+            if (dir < 0 and encoderVal > prevVal) encoderVal = 0;
+            if (dir > 0 and encoderVal < prevVal) encoderVal = (1 << 16);
+            encoderClkStatus = !encoderClkStatus;
+        }
+
+        bvEncoderData = (bvEncoderData << 1) | digitalRead((uint8_t) Pinout::ROT_ENC_B);
+        if ((bvEncoderData | 0xe000) == 0xf000) {
+            encoderDataStatus = true;
+        }
+        else if ((bvEncoderData & 0xfff4) == 0xfff0) {
+            encoderDataStatus = false;
+        }
+
+        bvRun = (bvRun << 1) | digitalRead((uint8_t) Pinout::RUN_SW) | 0xe000;
+        if (bvRun == 0xf000) {
+            startPressed = true;
+            runStatus = !runStatus;
+        }
+
+        bvStop = (bvStop << 1) | digitalRead((uint8_t) Pinout::STOP_SW) | 0xe000;
+        if (bvStop == 0xf000) {
+            digitalWrite((uint8_t) Pinout::RUN_SW_LED, LOW);
+            ctrlOn = false;
+            stopStatus = !stopStatus;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(3));
+    }
+}
 
 void setup() {
     helpers::initAll();
     esp_log_level_set("*", ESP_LOG_DEBUG);
+    ctrlOn = false;
+    startPressed = false;
     
-    attachInterrupt((uint8_t) Pinout::RUN_SW, [](){
-        // Switch from manual to auto mode: sample Spellman DAC and hold via SPS30 
-        digitalWrite((uint8_t) Pinout::RUN_SW_LED, HIGH);
-        xTaskCreate(buzzTask, "buzzTask", 512, nullptr, 5, nullptr);
-        ramp = true;
-        hold = false;
-    }, FALLING);
-
-    attachInterrupt((uint8_t) Pinout::STOP_SW, [](){
-        // Switch from auto to manual mode
-        digitalWrite((uint8_t) Pinout::RUN_SW_LED, LOW);
-        digitalWrite((uint8_t) Pinout::REMOTE_TRIGGER_LV, LOW);
-        ramp = true;
-        hold = false;
-    }, FALLING);
-   
-    attachInterrupt((uint8_t) Pinout::REMOTE_TRIGGER_SW, [](){
-        digitalWrite((uint8_t) Pinout::REMOTE_TRIGGER_LV, HIGH);
-    }, FALLING);
-
-    attachInterrupt((uint8_t) Pinout::ENCODER_SW, [](){
-        ramp = false;
-        hold = true;
-    }, FALLING);
-
-    attachInterrupt((uint8_t) Pinout::ROT_ENC_A, [](){
-        // auto dir = digitalRead((uint8_t) Pinout::ROT_ENC_B);
-        auto dir = 1;
-        target += dir;
-    }, FALLING);
-
-
     auto controllerOut = new dac::DAC8571(Wire);
     auto controllerIn = new adc::MCP3428(Wire);
     pid = new controls::PID(controllerIn, controllerOut);
+    pid->setTuning((controls::PidTuning) {
+        .kp = 0.05,
+        .ki = 0,
+        .kd = 0.05,
+        .satMin = -1e-2,
+        .satMax = 1e-2,
+        .compMin = -0.00002,
+        .compMax = 0.00002
+    });
+
+    xTaskCreate(pollingTask, "pollingTask", 512, nullptr, 1, nullptr);
 }
 
 void loop() {
-    // Testing DAC: not working
-    // digitalWrite((uint8_t) Pinout::REMOTE_TRIGGER_LV, HIGH);
-    // delay(2000);
-    // digitalWrite((uint8_t) Pinout::REMOTE_TRIGGER_LV, LOW);
+    if (startPressed) {
+        digitalWrite((uint8_t) Pinout::RUN_SW_LED, HIGH);
+        xTaskCreate(buzzTask, "buzzTask", 512, nullptr, 5, nullptr);
+        pid->sampleTarget();
+        pid->setOutput(encoderVal);
+        ctrlOn = true;
+        vTaskDelay(3e2);
+        startPressed = false;
+    }
 
-    if (ramp)
-        pid->rampAsync(target * ENDODER_SCALE_K);
-    
-    if (hold)
-        pid->holdAsync(target * ENDODER_SCALE_K);
-    delay(1e2);
+    if (ctrlOn) {
+        encoderVal = pid->loopAsync();
+        delay(1e3);
+    }
+    else {
+        pid->forward(encoderVal);
+        delay(1e2);
+    }
 }
