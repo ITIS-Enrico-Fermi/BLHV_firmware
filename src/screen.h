@@ -30,3 +30,19 @@ public:
     virtual void update(void * new_status) = 0;
     virtual void signal(HMI::Action action) = 0;
 };
+
+class ScreenSwitcher {
+private:
+    int current_page = 0;
+
+public:
+    ScreenSwitcher() {}
+
+    void setPage(int page) {
+        current_page = page;
+    }
+
+    int getPage() {
+        return current_page;
+    }
+};

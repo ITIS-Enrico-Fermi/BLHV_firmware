@@ -17,10 +17,11 @@ namespace Screens {
     class Settings: public Screen {
     private:
         LcdGfxMenu menu;
+        ScreenSwitcher &switcher;
         bool update_flag = true;
 
     public:
-        Settings(Display &d): Screen(d), menu(settings_menu_items, sizeof(settings_menu_items) / sizeof(const char *)) {}
+        Settings(Display &d, ScreenSwitcher &switcher): Screen(d), menu(settings_menu_items, sizeof(settings_menu_items) / sizeof(const char *)), switcher(switcher) {}
 
         virtual void begin() {
             DisplaySSD1306_128x32_I2C &hardware = display.getHardwareHandle();
@@ -45,7 +46,8 @@ namespace Screens {
                 menu.up();
 
             else if (action == HMI::Action::KNOB_CLICK)
-                menu.selection();
+                //switcher.setPage(menu.selection());
+                switcher.setPage(1);
 
             update_flag = true;
         };

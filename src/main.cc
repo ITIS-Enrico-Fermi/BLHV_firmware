@@ -102,7 +102,8 @@ void setup() {
     display.setup();
     display.getHardwareHandle().clear();
 
-    Screen *current_screen = new Screens::StatusMonitor(display);
+    Screen *monitor = new Screens::StatusMonitor(display);
+    Screen *current_screen = monitor;
     Screens::StatusMonitor::Status mainscreenstatus = {
         .running = true,
         .input_val = 100,
@@ -111,7 +112,9 @@ void setup() {
     };
     current_screen->update((void *)&mainscreenstatus);
 
-    Screen *menu = new Screens::Settings(display);
+    ScreenSwitcher switcher;
+
+    Screen *menu = new Screens::Settings(display, switcher);
     current_screen = menu;
     current_screen->begin();
 
@@ -146,9 +149,13 @@ void setup() {
 
         btn_stat = readButton();
 
-        Serial.println(digitalRead(12));
-        Serial.println(digitalRead(13));
-        Serial.println(digitalRead(14));
+        // Set page based on switcher
+        if (switcher.getPage() == 1)
+            current_screen = monitor;
+        else if (switcher.getPage() == 0)
+            current_screen = menu;
+
+        //todo: clear screen when switching
 
         current_screen->signal(btn_stat);
         current_screen->update(&mainscreenstatus);
