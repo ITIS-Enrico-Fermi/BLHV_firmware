@@ -2,6 +2,7 @@
 
 #include <Wire.h>
 #include <cassert>
+#include <error.h>
 #include "esp_log.h"
 
 
@@ -42,7 +43,10 @@ namespace adc {
                     | (uint8_t) g;
                 i2c->beginTransmission(ADDR);
                 i2c->write(CONF);
-                return !i2c->endTransmission();
+                if (i2c->endTransmission()) {
+                    puts("ADC reading error");
+                    errorHandler();
+                }
             }
 
             inline uint16_t read() override {

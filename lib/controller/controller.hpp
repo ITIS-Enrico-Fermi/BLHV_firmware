@@ -46,7 +46,7 @@ namespace controls {
             }
 
             uint16_t loopAsync() override {
-                float processvar = processvar = clamp(
+                float processvar = clamp(
                     normalize(this->adc->read(), 0, 1 << 16),
                     0, 1
                 );
