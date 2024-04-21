@@ -24,7 +24,7 @@
 
 constexpr auto ENDODER_INCREMENT = 50;
 controls::PID *pid = nullptr;
-std::atomic<bool> ctrlOn, startPressed;
+std::atomic_bool ctrlOn, startPressed;
 uint16_t encoderVal = 0;
 // float target = 0.318; // < target current measured in ADC units
 
@@ -82,7 +82,7 @@ void encoderPollingTask(void *pvParams) {
             encoderA = true;
             encoderCallback(encoderA, encoderB);
         }
-        else if (bvEncoderA == 0x0001) {
+        else if ((bvEncoderA | 0x0007) == 0x000f) {
             encoderA = false;
             encoderCallback(encoderA, encoderB);
         }
@@ -91,7 +91,7 @@ void encoderPollingTask(void *pvParams) {
         if ((bvEncoderB | 0xe000) == 0xf000) {
             encoderB = true;
         }
-        else if (bvEncoderB == 0x0001) {
+        else if ((bvEncoderB | 0x0007) == 0x000f) {
             encoderB = false;
         }
 
